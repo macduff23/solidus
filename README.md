@@ -64,7 +64,7 @@ combine it with your own custom frontend, admin interface, and API.
 
 Try out Solidus with one-click on Heroku:
 
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/solidusio/solidus)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/solidusio/solidus-example-app)
 
 ## Getting started
 
