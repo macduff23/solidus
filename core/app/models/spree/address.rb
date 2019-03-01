@@ -11,12 +11,15 @@ module Spree
     belongs_to :country, class_name: "Spree::Country"
     belongs_to :state, class_name: "Spree::State"
 
+    before_validation do
+      Spree::Address::StateNormalizer.new(self).perform!
+    end
+
     validates :firstname, :address1, :city, :country_id, presence: true
     validates :zipcode, presence: true, if: :require_zipcode?
     validates :phone, presence: true, if: :require_phone?
 
     validate :state_validate
-    validate :validate_state_matches_country
 
     alias_attribute :first_name, :firstname
     alias_attribute :last_name, :lastname
@@ -179,43 +182,22 @@ module Spree
     private
 
     def state_validate
-      # Skip state validation without country (also required)
-      # or when disabled by preference
-      return if country.blank? || !Spree::Config[:address_requires_state]
-      return unless country.states_required
+      Spree::Address::StateValidator.new(self).perform!
 
-      # ensure associated state belongs to country
-      if state.present?
-        if state.country == country
-          self.state_name = nil # not required as we have a valid state and country combo
-        elsif state_name.present?
-          self.state = nil
-        else
-          errors.add(:state, :invalid)
-        end
-      end
-
-      # ensure state_name belongs to country without states, or that it matches a predefined state name/abbr
-      if state_name.present?
-        if country.states.present?
-          states = country.states.with_name_or_abbr(state_name)
-
-          if states.size == 1
-            self.state = states.first
-            self.state_name = nil
-          else
-            errors.add(:state, :invalid)
-          end
-        end
-      end
-
-      # ensure at least one state field is populated
-      errors.add :state, :blank if state.blank? && state_name.blank?
+      deprecate_validate_state_matches_country
     end
 
-    def validate_state_matches_country
-      if state && state.country != country
-        errors.add(:state, :does_not_match_country)
+    def deprecate_validate_state_matches_country
+      # warn about the deprecation if the method has been monkey patched
+      if respond_to?(:validate_state_matches_country, true)
+        Spree::Deprecation.warn(
+          'The `Spree::Address#validate_state_matches_country` method has been deprecated.' \
+          ' See https://github.com/solidusio/solidus/pull/3129'
+        )
+        # redefine the method to catch any `super` calls from the monkey patched method
+        self.class.define_method :validate_state_matches_country do; end
+        # call the monkey patched method
+        validate_state_matches_country
       end
     end
   end

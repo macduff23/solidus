@@ -19,21 +19,36 @@ RSpec.describe Spree::Address, type: :model do
 
   context "validation" do
     let(:country) { create :country, states_required: true }
-    let(:state) { Spree::State.new name: 'maryland', abbr: 'md', country: country }
+    let(:state) { create :state, name: 'maryland', abbr: 'md', country: country }
     let(:address) { build(:address, country: country) }
 
     before do
       allow(country.states).to receive_messages with_name_or_abbr: [state]
     end
 
-    context 'address does not require state' do
-      before do
-        Spree::Config.address_requires_state = false
+    context "state is not required" do
+      shared_examples "no state validation" do
+        it "doesn't validate the state presence" do
+          address.state = nil
+          address.state_name = nil
+          expect(address).to be_valid
+        end
       end
-      it "address_requires_state preference is false" do
-        address.state = nil
-        address.state_name = nil
-        expect(address).to be_valid
+
+      context "address_requires_state preference is false" do
+        before do
+          Spree::Config.address_requires_state = false
+        end
+
+        include_examples "no state validation"
+      end
+
+      context "country does not require state" do
+        before do
+          allow(country).to receive(:states_required).and_return(false)
+        end
+
+        include_examples "no state validation"
       end
     end
 
@@ -56,8 +71,6 @@ RSpec.describe Spree::Address, type: :model do
 
       it "full state name is in state_name and country does contain that state" do
         address.state_name = 'alabama'
-        # called by state_validate to set up state_id.
-        # Perhaps this should be a before_validation instead?
         expect(address).to be_valid
         expect(address.state).not_to be_nil
         expect(address.state_name).to be_nil
@@ -70,20 +83,25 @@ RSpec.describe Spree::Address, type: :model do
         expect(address.state_name).to be_nil
       end
 
-      context 'when the country does not match the state' do
-        context 'when the country requires states' do
-          it 'is invalid' do
-            address.state = state
-            address.country = Spree::Country.new(states_required: true)
-            address.valid?
-            expect(address.errors["state"]).to eq(['is invalid', 'does not match the country'])
+      context "state country doesn't match the address' country" do
+        context "with address country w/o states" do
+          before do
+            allow(country).to receive(:states).and_return([])
+          end
+
+          it "nullifies the state" do
+            expect{ address.valid? }.to change(address, :state).to(nil)
           end
         end
 
-        context 'when the country does not require states' do
+        context "with address country having states" do
+          let(:italy) { create(:country, iso: 'IT', states_required: true) }
+          let!(:it_state) { create(:state, country: italy) }
+          let(:us_state) { create(:state, country_iso: 'US') }
+
           it 'is invalid' do
-            address.state = state
-            address.country = Spree::Country.new(states_required: false)
+            address.country = italy
+            address.state = us_state
             address.valid?
             expect(address.errors["state"]).to eq(['does not match the country'])
           end
