@@ -35,6 +35,8 @@ module Spree
     validates_attachment :icon,
       content_type: { content_type: ["image/jpg", "image/jpeg", "image/png", "image/gif"] }
 
+    self.whitelisted_ransackable_attributes = %w[name]
+
     # @note This method is meant to be overridden on a store by store basis.
     # @return [Array] filters that should be used for a taxon
     def applicable_filters
@@ -59,9 +61,8 @@ module Spree
     # Sets this taxons permalink to a valid url encoded string based on its
     # name and its parents permalink (if present.)
     def set_permalink
-      permalink_tail = permalink.split('/').last if permalink.present?
-      permalink_tail ||= Spree::Config.taxon_url_parametizer_class.parameterize(name)
-      self.permalink_part = permalink_tail
+      permalink_tail = permalink.present? ? permalink.split('/').last : name
+      self.permalink_part = Spree::Config.taxon_url_parametizer_class.parameterize(permalink_tail)
     end
 
     # Update the permalink for this taxon and all children (if necessary)
